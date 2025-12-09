@@ -1,0 +1,5 @@
+{
+  "name": "Háztartás Költségvetés",
+  "description": "A collaborative household budget tracker with soft-delete, audit logs, and rolling balances.",
+  "requestFramePermissions": []
+}

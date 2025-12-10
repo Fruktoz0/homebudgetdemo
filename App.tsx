@@ -11,6 +11,10 @@ import {
 import { User, Household, Transaction, TransactionType, Invitation, RecurringItem, SavingGoal, SavingLog, AuditLog } from './types';
 import { Card, Button, Input, Select } from './components/Components';
 import BudgetChart from './components/BudgetChart';
+import SankeyChart from './components/SankeyChart';
+import HeatmapChart from './components/HeatmapChart';
+import AverageSpendingChart from './components/AverageSpendingChart';
+import StackedAreaChart from './components/StackedAreaChart';
 import { CATEGORIES } from './constants';
 
 // --- DATE HELPERS (Replacement for date-fns) ---
@@ -80,7 +84,8 @@ const Icons = {
   Download: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>,
   Eye: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>,
   User: () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>,
-  LogoutBox: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+  LogoutBox: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>,
+  ChartBar: () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
 };
 
 // --- COMPONENTS FOR RECURRING ---
@@ -88,7 +93,7 @@ const RecurringItemCard: React.FC<{
   item: RecurringItem, 
   status: 'paid' | 'pending', 
   paidAmount?: number,
-  currency: string,
+  currency: string, 
   onPay: () => void,
   onEdit: () => void,
   onDelete: () => void 
@@ -228,7 +233,6 @@ const SavingCard: React.FC<{
 
 
 // --- AUTH & SETUP COMPONENTS ---
-
 const AuthPage: React.FC<{ onLogin: () => void }> = ({ onLogin }) => {
   const [isLoginMode, setIsLoginMode] = useState(true);
   const [email, setEmail] = useState('');
@@ -779,8 +783,9 @@ const Dashboard: React.FC<{ user: User, household: Household, onLogout: () => vo
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [recurringItems, setRecurringItems] = useState<RecurringItem[]>([]);
   const [savings, setSavings] = useState<SavingGoal[]>([]);
-  const [activeTab, setActiveTab] = useState<'overview' | 'recurring' | 'savings'>('overview');
-  
+  const [activeTab, setActiveTab] = useState<'overview' | 'recurring' | 'savings' | 'stats'>('overview');
+  const [statsChartType, setStatsChartType] = useState<'SANKEY' | 'PIE' | 'HEATMAP' | 'AVERAGE' | 'STACKED'>('SANKEY');
+
   // Modals & Menu State
   const [showAddModal, setShowAddModal] = useState(false);
   const [showRecurringModal, setShowRecurringModal] = useState(false);
@@ -821,6 +826,7 @@ const Dashboard: React.FC<{ user: User, household: Household, onLogout: () => vo
   const [selectedSaving, setSelectedSaving] = useState<SavingGoal | null>(null);
   const [savingUpdateAmount, setSavingUpdateAmount] = useState('');
   const [savingUpdateType, setSavingUpdateType] = useState<'DEPOSIT' | 'WITHDRAW'>('DEPOSIT');
+  const [createTransactionForSaving, setCreateTransactionForSaving] = useState(true);
 
   // Payment State (For recurring)
   const [selectedRecItem, setSelectedRecItem] = useState<RecurringItem | null>(null);
@@ -998,6 +1004,7 @@ const Dashboard: React.FC<{ user: User, household: Household, onLogout: () => vo
     setSelectedSaving(item);
     setSavingUpdateType(type);
     setSavingUpdateAmount('');
+    setCreateTransactionForSaving(true);
     setShowSavingUpdateModal(true);
   };
 
@@ -1012,6 +1019,21 @@ const Dashboard: React.FC<{ user: User, household: Household, onLogout: () => vo
       savingUpdateType === 'DEPOSIT' ? 'Befizetés' : 'Kivét',
       user.id
     );
+
+    if (createTransactionForSaving) {
+        addTransaction({
+            type: savingUpdateType === 'DEPOSIT' ? TransactionType.EXPENSE : TransactionType.INCOME,
+            amount: amount,
+            description: savingUpdateType === 'DEPOSIT' 
+                ? `Megtakarítás: ${selectedSaving.name}` 
+                : `Kivét: ${selectedSaving.name}`,
+            category: 'Megtakarítás',
+            date: formatToYmd(new Date()),
+            createdBy: user.id,
+            isRecurringInstance: false
+        });
+    }
+
     setShowSavingUpdateModal(false);
     refreshData();
   };
@@ -1151,6 +1173,11 @@ const Dashboard: React.FC<{ user: User, household: Household, onLogout: () => vo
                 {formatMoney(savings.reduce((sum, s) => sum + s.currentAmount, 0))}
               </div>
            </div>
+         ) : activeTab === 'stats' ? (
+           <div className="text-center text-white pb-6">
+              <div className="text-lg font-bold">Statisztikák</div>
+              <div className="text-sm opacity-80">Részletes kimutatások</div>
+           </div>
          ) : (
           <>
             {filterMode === 'MONTHLY' ? (
@@ -1178,32 +1205,41 @@ const Dashboard: React.FC<{ user: User, household: Household, onLogout: () => vo
       {/* TABS CONTENT AREA */}
       <div className="flex-1 overflow-y-auto -mt-16 px-4 pb-20">
         
-        {activeTab === 'overview' && (
-          <>
-            {/* FILTER BAR - DATE */}
-            <div className="flex flex-col gap-3 mb-4">
-              <div className="bg-surface p-1.5 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
-                 <button 
-                   onClick={setFilterCurrentMonth}
-                   className={`flex-1 py-2 text-xs font-bold rounded-lg transition ${filterMode === 'MONTHLY' && isWithinInterval(new Date(), {start: getStartOfMonth(currentDate), end: getEndOfMonth(currentDate)}) ? 'bg-primary text-white shadow-sm' : 'text-textSecondary hover:bg-gray-50'}`}
-                 >
-                   Aktuális
-                 </button>
-                 <button 
-                   onClick={setFilterPrevMonth}
-                   className={`flex-1 py-2 text-xs font-bold rounded-lg transition ${filterMode === 'MONTHLY' && isWithinInterval(addMonths(new Date(), -1), {start: getStartOfMonth(currentDate), end: getEndOfMonth(currentDate)}) ? 'bg-primary text-white shadow-sm' : 'text-textSecondary hover:bg-gray-50'}`}
-                 >
-                   Előző hó
-                 </button>
-                 <button 
-                   onClick={() => setFilterMode('CUSTOM')}
-                   className={`flex-1 py-2 text-xs font-bold rounded-lg transition ${filterMode === 'CUSTOM' ? 'bg-primary text-white shadow-sm' : 'text-textSecondary hover:bg-gray-50'}`}
-                 >
-                   Egyedi
-                 </button>
-              </div>
+        {(activeTab === 'overview' || (activeTab === 'stats' && statsChartType !== 'HEATMAP')) && (
+           // Shared Filter bar logic for Overview AND Stats (Sankey/Pie)
+           // Heatmap & Average & Stacked use their own internal logic or rely on main date but hide the toggle if not applicable (Heatmap now uses main date)
+          <div className="flex flex-col gap-3 mb-4">
+              
+              {(activeTab === 'stats' && (statsChartType === 'STACKED' || statsChartType === 'AVERAGE')) ? (
+                  <div className="bg-surface p-3 rounded-xl shadow-sm border border-gray-100 flex items-center justify-center">
+                      <span className="text-xs font-bold text-textSecondary uppercase flex items-center gap-2">
+                        <Icons.Calendar className="w-4 h-4" /> Elmúlt időszak (Trend)
+                      </span>
+                  </div>
+              ) : (
+                  <div className="bg-surface p-1.5 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
+                     <button 
+                       onClick={setFilterCurrentMonth}
+                       className={`flex-1 py-2 text-xs font-bold rounded-lg transition ${filterMode === 'MONTHLY' && isWithinInterval(new Date(), {start: getStartOfMonth(currentDate), end: getEndOfMonth(currentDate)}) ? 'bg-primary text-white shadow-sm' : 'text-textSecondary hover:bg-gray-50'}`}
+                     >
+                       Aktuális
+                     </button>
+                     <button 
+                       onClick={setFilterPrevMonth}
+                       className={`flex-1 py-2 text-xs font-bold rounded-lg transition ${filterMode === 'MONTHLY' && isWithinInterval(addMonths(new Date(), -1), {start: getStartOfMonth(currentDate), end: getEndOfMonth(currentDate)}) ? 'bg-primary text-white shadow-sm' : 'text-textSecondary hover:bg-gray-50'}`}
+                     >
+                       Előző hó
+                     </button>
+                     <button 
+                       onClick={() => setFilterMode('CUSTOM')}
+                       className={`flex-1 py-2 text-xs font-bold rounded-lg transition ${filterMode === 'CUSTOM' ? 'bg-primary text-white shadow-sm' : 'text-textSecondary hover:bg-gray-50'}`}
+                     >
+                       Egyedi
+                     </button>
+                  </div>
+              )}
 
-              {filterMode === 'CUSTOM' && (
+              {filterMode === 'CUSTOM' && !(activeTab === 'stats' && (statsChartType === 'STACKED' || statsChartType === 'AVERAGE')) && (
                 <div className="bg-surface p-3 rounded-xl shadow-sm border border-gray-100 flex gap-2 animate-fade-in">
                   <div className="flex-1">
                     <label className="text-[10px] text-textSecondary font-bold uppercase block mb-1">Tól</label>
@@ -1225,9 +1261,40 @@ const Dashboard: React.FC<{ user: User, household: Household, onLogout: () => vo
                   </div>
                 </div>
               )}
+          </div>
+        )}
 
-              {/* FILTER BAR - TYPE */}
-              <div className="bg-surface p-1 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
+        {/* For Heatmap we show the filter bar so user can change months, but we might want to hide "Custom" if Heatmap doesn't support it well, but let's keep it for now as Year view */}
+        {activeTab === 'stats' && statsChartType === 'HEATMAP' && (
+             <div className="flex flex-col gap-3 mb-4">
+              <div className="bg-surface p-1.5 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
+                 <button 
+                   onClick={setFilterCurrentMonth}
+                   className={`flex-1 py-2 text-xs font-bold rounded-lg transition ${filterMode === 'MONTHLY' ? 'bg-primary text-white shadow-sm' : 'text-textSecondary hover:bg-gray-50'}`}
+                 >
+                   Havi (Naptár)
+                 </button>
+                 <button 
+                   onClick={() => setFilterMode('CUSTOM')} // Using Custom as Year/Global view toggle here effectively
+                   className={`flex-1 py-2 text-xs font-bold rounded-lg transition ${filterMode === 'CUSTOM' ? 'bg-primary text-white shadow-sm' : 'text-textSecondary hover:bg-gray-50'}`}
+                 >
+                   Éves
+                 </button>
+              </div>
+              {filterMode === 'MONTHLY' && (
+                  <div className="flex justify-between items-center bg-white p-2 rounded-xl border border-gray-100">
+                      <button onClick={prevMonth} className="p-2 hover:bg-gray-100 rounded-full"><Icons.ChevronLeft /></button>
+                      <span className="font-bold text-sm text-textPrimary">{formatToMonthYear(currentDate)}</span>
+                      <button onClick={nextMonth} className="p-2 hover:bg-gray-100 rounded-full"><Icons.ChevronRight /></button>
+                  </div>
+              )}
+             </div>
+        )}
+
+        {activeTab === 'overview' && (
+          <>
+            {/* FILTER BAR - TYPE (Only for Overview) */}
+              <div className="bg-surface p-1 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between mb-4">
                   <button 
                       onClick={() => setFilterType('ALL')}
                       className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition ${filterType === 'ALL' ? 'bg-gray-700 text-white shadow-sm' : 'text-textSecondary hover:bg-gray-50'}`}
@@ -1247,7 +1314,6 @@ const Dashboard: React.FC<{ user: User, household: Household, onLogout: () => vo
                       Kiadás
                   </button>
               </div>
-            </div>
 
             {/* FLOATING CARD STATS */}
             <Card className="flex flex-col items-center shadow-lg mb-6">
@@ -1265,7 +1331,15 @@ const Dashboard: React.FC<{ user: User, household: Household, onLogout: () => vo
             </Card>
 
             {/* TRANSACTION LIST */}
-            <h3 className="text-textSecondary font-bold text-sm uppercase tracking-wider mb-3 ml-2">Tranzakciók</h3>
+            <div className="flex justify-between items-end mb-3 ml-2 mr-2">
+                <h3 className="text-textSecondary font-bold text-sm uppercase tracking-wider">Tranzakciók</h3>
+                <span className="text-[10px] text-textSecondary font-medium bg-gray-100 px-2 py-1 rounded">
+                    {filterMode === 'MONTHLY' 
+                        ? formatToMonthYear(currentDate) 
+                        : `${formatToMonthDay(parseISODate(customDateRange.start))} - ${formatToMonthDay(parseISODate(customDateRange.end))}`}
+                </span>
+            </div>
+            
             <div className="space-y-3">
               {filteredTransactions.length === 0 ? (
                 <div className="text-center text-textSecondary py-8 opacity-60">Nincs tranzakció a kiválasztott szűrők alapján.</div>
@@ -1377,6 +1451,96 @@ const Dashboard: React.FC<{ user: User, household: Household, onLogout: () => vo
              )}
           </div>
         )}
+
+        {activeTab === 'stats' && (
+          <div className="pt-2">
+            <div className="flex bg-gray-100 p-1 rounded-lg mb-4 overflow-x-auto no-scrollbar">
+               <button 
+                 onClick={() => setStatsChartType('SANKEY')}
+                 className={`flex-none px-4 py-1.5 text-xs font-bold rounded-md transition whitespace-nowrap ${statsChartType === 'SANKEY' ? 'bg-white shadow-sm text-primary' : 'text-textSecondary'}`}
+               >
+                 Sankey
+               </button>
+               <button 
+                 onClick={() => setStatsChartType('PIE')}
+                 className={`flex-none px-4 py-1.5 text-xs font-bold rounded-md transition whitespace-nowrap ${statsChartType === 'PIE' ? 'bg-white shadow-sm text-primary' : 'text-textSecondary'}`}
+               >
+                 Kategóriák
+               </button>
+               <button 
+                 onClick={() => setStatsChartType('HEATMAP')}
+                 className={`flex-none px-4 py-1.5 text-xs font-bold rounded-md transition whitespace-nowrap ${statsChartType === 'HEATMAP' ? 'bg-white shadow-sm text-primary' : 'text-textSecondary'}`}
+               >
+                 Hőtérkép
+               </button>
+               <button 
+                 onClick={() => setStatsChartType('STACKED')}
+                 className={`flex-none px-4 py-1.5 text-xs font-bold rounded-md transition whitespace-nowrap ${statsChartType === 'STACKED' ? 'bg-white shadow-sm text-primary' : 'text-textSecondary'}`}
+               >
+                 Trend
+               </button>
+               <button 
+                 onClick={() => setStatsChartType('AVERAGE')}
+                 className={`flex-none px-4 py-1.5 text-xs font-bold rounded-md transition whitespace-nowrap ${statsChartType === 'AVERAGE' ? 'bg-white shadow-sm text-primary' : 'text-textSecondary'}`}
+               >
+                 Átlagok
+               </button>
+            </div>
+
+            {statsChartType === 'SANKEY' && (
+                <div className="animate-fade-in">
+                    <p className="text-xs text-textSecondary text-center mb-4">
+                        A pénzáramlás vizualizációja a bevételektől a kiadásokig.
+                    </p>
+                    <SankeyChart transactions={filteredTransactions} currency={household.currency} />
+                </div>
+            )}
+
+            {statsChartType === 'PIE' && (
+                <div className="animate-fade-in">
+                     <Card className="flex flex-col items-center shadow-sm">
+                        <h4 className="text-center text-xs font-bold text-textSecondary uppercase tracking-wider mb-2">Kiadások Kategóriánként</h4>
+                        <BudgetChart transactions={filteredTransactions} />
+                     </Card>
+                     <div className="mt-4 text-center text-xs text-textSecondary italic">
+                        Az aktuálisan szűrt időszak adatai alapján.
+                     </div>
+                </div>
+            )}
+
+            {statsChartType === 'HEATMAP' && (
+                <div className="animate-fade-in">
+                    <p className="text-xs text-textSecondary text-center mb-4">
+                        Napi kiadások intenzitása. 
+                        {filterMode === 'MONTHLY' ? ' Havi naptár nézet.' : ' Éves áttekintés.'}
+                    </p>
+                    <HeatmapChart 
+                        transactions={transactions} 
+                        currentDate={currentDate} 
+                        mode={filterMode as 'MONTHLY' | 'CUSTOM'}
+                        currency={household.currency} 
+                    />
+                </div>
+            )}
+
+            {statsChartType === 'STACKED' && (
+                <div className="animate-fade-in">
+                    <StackedAreaChart transactions={transactions} currency={household.currency} />
+                </div>
+            )}
+
+            {statsChartType === 'AVERAGE' && (
+                <div className="animate-fade-in">
+                    <p className="text-xs text-textSecondary text-center mb-4">
+                        Havi átlagos költés kategóriánként.
+                    </p>
+                    <AverageSpendingChart transactions={transactions} currency={household.currency} />
+                </div>
+            )}
+            
+            <div className="h-10"></div>
+          </div>
+        )}
       </div>
 
       {/* SIDE DRAWER FOR PROFILE */}
@@ -1444,31 +1608,38 @@ const Dashboard: React.FC<{ user: User, household: Household, onLogout: () => vo
       )}
 
       {/* BOTTOM NAVIGATION */}
-      <div className="fixed bottom-0 left-0 right-0 bg-surface border-t border-gray-200 p-2 flex justify-around items-center z-40 max-w-md mx-auto">
+      <div className="fixed bottom-0 left-0 right-0 bg-surface border-t border-gray-200 p-2 flex justify-between items-center z-40 max-w-md mx-auto">
         <button 
           onClick={() => setActiveTab('overview')}
-          className={`flex flex-col items-center p-2 rounded-lg w-1/4 transition ${activeTab === 'overview' ? 'text-primary' : 'text-textSecondary'}`}
+          className={`flex flex-col items-center p-2 rounded-lg flex-1 transition ${activeTab === 'overview' ? 'text-primary' : 'text-textSecondary'}`}
         >
           <Icons.Home />
-          <span className="text-[10px] font-medium mt-1">Áttekintés</span>
+          <span className="text-[10px] font-medium mt-1">Főoldal</span>
         </button>
         <button 
           onClick={() => setActiveTab('recurring')}
-          className={`flex flex-col items-center p-2 rounded-lg w-1/4 transition ${activeTab === 'recurring' ? 'text-primary' : 'text-textSecondary'}`}
+          className={`flex flex-col items-center p-2 rounded-lg flex-1 transition ${activeTab === 'recurring' ? 'text-primary' : 'text-textSecondary'}`}
         >
           <Icons.List />
           <span className="text-[10px] font-medium mt-1">Fix</span>
         </button>
         <button 
           onClick={() => setActiveTab('savings')}
-          className={`flex flex-col items-center p-2 rounded-lg w-1/4 transition ${activeTab === 'savings' ? 'text-primary' : 'text-textSecondary'}`}
+          className={`flex flex-col items-center p-2 rounded-lg flex-1 transition ${activeTab === 'savings' ? 'text-primary' : 'text-textSecondary'}`}
         >
           <Icons.PiggyBank />
-          <span className="text-[10px] font-medium mt-1">Megtakarítás</span>
+          <span className="text-[10px] font-medium mt-1">Zseb</span>
+        </button>
+        <button 
+          onClick={() => setActiveTab('stats')}
+          className={`flex flex-col items-center p-2 rounded-lg flex-1 transition ${activeTab === 'stats' ? 'text-primary' : 'text-textSecondary'}`}
+        >
+          <Icons.ChartBar />
+          <span className="text-[10px] font-medium mt-1">Stat</span>
         </button>
         <button 
           onClick={() => setIsProfileOpen(true)}
-          className={`flex flex-col items-center p-2 rounded-lg w-1/4 transition ${isProfileOpen ? 'text-primary' : 'text-textSecondary'}`}
+          className={`flex flex-col items-center p-2 rounded-lg flex-1 transition ${isProfileOpen ? 'text-primary' : 'text-textSecondary'}`}
         >
           <Icons.User />
           <span className="text-[10px] font-medium mt-1">Profil</span>
@@ -1476,7 +1647,7 @@ const Dashboard: React.FC<{ user: User, household: Household, onLogout: () => vo
       </div>
 
       {/* FAB ADD BUTTON */}
-      {!isProfileOpen && (
+      {!isProfileOpen && activeTab !== 'stats' && (
           <button 
             onClick={handleFabClick}
             className="fixed bottom-20 right-6 bg-primary text-white p-4 rounded-full shadow-lg shadow-blue-300 hover:scale-105 active:scale-95 transition-all z-50"
@@ -1604,6 +1775,27 @@ const Dashboard: React.FC<{ user: User, household: Household, onLogout: () => vo
               {savingUpdateType === 'DEPOSIT' ? 'Hozzáadás ehhez:' : 'Kivétel innen:'} <span className="font-bold text-textPrimary">{selectedSaving.name}</span>
             </p>
             <Input type="number" label="Összeg" value={savingUpdateAmount} onChange={e => setSavingUpdateAmount(e.target.value)} placeholder="0" autoFocus />
+            
+            <div className="mb-6 flex items-center bg-gray-50 p-3 rounded-lg border border-gray-100">
+               <input 
+                  type="checkbox" 
+                  id="createTx" 
+                  checked={createTransactionForSaving} 
+                  onChange={e => setCreateTransactionForSaving(e.target.checked)}
+                  className="w-5 h-5 text-primary rounded focus:ring-primary border-gray-300"
+               />
+               <label htmlFor="createTx" className="ml-3 flex flex-col cursor-pointer">
+                  <span className="text-sm font-bold text-textPrimary">
+                     Rögzítés tranzakcióként is
+                  </span>
+                  <span className="text-xs text-textSecondary">
+                     {savingUpdateType === 'DEPOSIT' 
+                        ? 'Kiadásként kerül a naplóba (pénzmozgás).' 
+                        : 'Bevételként kerül a naplóba (pénzmozgás).'}
+                  </span>
+               </label>
+            </div>
+
             <Button 
               onClick={handleUpdateSavingBalance} 
               fullWidth 
